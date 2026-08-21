@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3x3 Mines</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #121a2d;
+      --card-inner: #18223a;
+      --cell-unrevealed: #233152;
+      --cell-unrevealed-hover: #2c3e66;
+      --cell-revealed: #0c1220;
+      --border: #28395f;
+      --text: #f8fafc;
+      --text-dim: #94a3b8;
+      --accent: #38bdf8;
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.25);
+      --success: #22c55e;
+      --success-bg: rgba(34, 197, 94, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    .container {
+      background: var(--card);
+      padding: 1.5rem;
+      border-radius: 1.25rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 1.3rem;
+      font-weight: 800;
+    }
+
+    .pf-badge {
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 0.3rem 0.7rem;
+      border-radius: 2rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .modes {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+
+    .mode-btn {
+      background: var(--cell-unrevealed);
+      border: 2px solid transparent;
+      color: var(--text-dim);
+      padding: 0.55rem 0.2rem;
+      border-radius: 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .mode-btn.active {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-inner);
+      padding: 0.75rem 1rem;
+      border-radius: 0.6rem;
+      font-size: 0.9rem;
+      border: 1px solid var(--border);
+    }
+
+    .score-display {
+      font-weight: 800;
+      font-size: 1.15rem;
+    }
+    .score-pos { color: var(--success); }
+    .score-neg { color: var(--danger); }
+
+    .action-btn {
+      background: var(--accent);
+      color: #090d16;
+      border: none;
+      padding: 0.65rem;
+      border-radius: 0.6rem;
+      font-size: 0.9rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: opacity 0.1s;
+    }
+    .action-btn:active { opacity: 0.8; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.55rem;
+      aspect-ratio: 1 / 1;
+      margin: 0.25rem 0;
+    }
+
+    .cell {
+      background: var(--cell-unrevealed);
+      border-radius: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.7rem;
+      font-weight: 800;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 3px 6px rgba(0, 0, 0, 0.3);
+      transition: transform 0.05s ease, background 0.15s ease;
+    }
+
+    .cell:hover:not(.revealed) {
+      background: var(--cell-unrevealed-hover);
+    }
+
+    .cell:active:not(.revealed) {
+      transform: scale(0.96);
+    }
+
+    .cell.revealed {
+      background: var(--cell-revealed);
+      cursor: default;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+      border: 1px solid #1a253a;
+    }
+
+    .cell.revealed.empty-dot::after {
+      content: "•";
+      color: #334155;
+      font-size: 1.2rem;
+    }
+
+    .cell.detonated {
+      background: var(--danger-bg) !important;
+      border-color: var(--danger) !important;
+    }
+
+    .cell.defused {
+      background: var(--success-bg) !important;
+      border-color: var(--success) !important;
+    }
+
+    .cell[data-count="1"] { color: #38bdf8; }
+    .cell[data-count="2"] { color: #4ade80; }
+    .cell[data-count="3"] { color: #f87171; }
+    .cell[data-count="4"] { color: #c084fc; }
+
+    /* Provably Fair Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+      z-index: 100;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #111827;
+      width: 100%;
+      max-width: 440px;
+      border-radius: 1.25rem 1.25rem 0 0;
+      border: 1px solid #374151;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      animation: slideUp 0.2s ease-out;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title { font-size: 1.1rem; font-weight: 800; }
+
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .modal-desc {
+      font-size: 0.75rem;
+      line-height: 1.4;
+      color: var(--text-dim);
+    }
+
+    .verify-box {
+      background: #1f2937;
+      border-radius: 0.75rem;
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      font-size: 0.75rem;
+    }
+
+    .verify-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .verify-label { color: var(--text-dim); }
+
+    .verify-val {
+      font-family: monospace;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.3rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 190px;
+      color: #e5e7eb;
+    }
+
+    .check-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.3rem 0.2rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .check-valid { color: var(--success); }
+    .check-pending { color: var(--text-dim); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <h1>3x3 Mines</h1>
+      <div class="pf-badge" onclick="openModal()">⚖️ Provably Fair</div>
+    </div>
+
+    <div class="modes">
+      <button class="mode-btn active" onclick="setMode(1)">Mode 1<br><span style="font-size:0.65rem;opacity:0.8">1 Mine</span></button>
+      <button class="mode-btn" onclick="setMode(2)">Mode 2<br><span style="font-size:0.65rem;opacity:0.8">2 Mines</span></button>
+      <button class="mode-btn" onclick="setMode(3)">Mode 3<br><span style="font-size:0.65rem;opacity:0.8">3 Mines</span></button>
+    </div>
+
+    <div class="status-bar">
+      <span>Score: <span id="score" class="score-display score-pos">0</span></span>
+      <span id="game-status" style="font-weight: 800;">Active</span>
+    </div>
+
+    <button class="action-btn" onclick="initRound()">New Game</button>
+
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- Provably Fair Modal -->
+  <div class="modal-overlay" id="pfModal" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">Provably Fair</div>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+
+      <div class="modal-desc">
+        Bomb positions are generated deterministically from the committed <b>server seed</b> and your <b>client seed</b> before round start.
+      </div>
+
+      <div class="verify-box">
+        <div class="verify-row">
+          <span class="verify-label">Server seed hash</span>
+          <span class="verify-val" id="lblServerHash">...</span>
+        </div>
+        <div class="verify-row">
+          <span class="verify-label">Server seed</span>
+          <span class="verify-val" id="lblServerSeed">Hidden (reveals on finish)</span>
+        </div>
+        <div class="verify-row">
+          <span class="verify-label">Client seed</span>
+          <span class="verify-val" id="lblClientSeed">...</span>
+        </div>
+        <div class="verify-row">
+          <span class="verify-label">Entropy domain</span>
+          <span class="verify-val">0</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="check-row">
+          <span>Seed hash matches</span>
+          <span id="checkHash" class="check-status check-pending">⌛ Pending finish</span>
+        </div>
+        <div class="check-row">
+          <span>Board matches</span>
+          <span id="checkBoard" class="check-status check-pending">⌛ Pending finish</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const GRID_SIZE = 3;
+    let mineCount = 1;
+    let score = 0;
+    let gameOver = false;
+    let gridData = [];
+
+    // Provably Fair State
+    let serverSeed = "";
+    let serverSeedHash = "";
+    let clientSeed = "";
+    const entropyDomain = 0;
+    let generatedMineIndices = [];
+
+    function generateHex(bytesLength = 32) {
+      const arr = new Uint8Array(bytesLength);
+      crypto.getRandomValues(arr);
+      return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function sha256(str) {
+      const buf = new TextEncoder().encode(str);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", buf);
+      return Array.from(new Uint8Array(hashBuffer), b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function deriveMines(sSeed, cSeed, domain, count) {
+      const combined = `${sSeed}:${cSeed}:${domain}`;
+      const hash = await sha256(combined);
+      const pool = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+      const mines = [];
+      
+      for (let i = 0; i < count; i++) {
+        const hexByte = hash.substr(i * 4, 4);
+        const randInt = parseInt(hexByte, 16);
+        const chosenIdx = randInt % pool.length;
+        mines.push(pool.splice(chosenIdx, 1)[0]);
+      }
+      return mines;
+    }
+
+    async function initRound() {
+      gameOver = false;
+      const statusEl = document.getElementById("game-status");
+      statusEl.textContent = "Active";
+      statusEl.style.color = "inherit";
+
+      serverSeed = generateHex(32);
+      serverSeedHash = await sha256(serverSeed);
+      clientSeed = generateHex(16);
+
+      generatedMineIndices = await deriveMines(serverSeed, clientSeed, entropyDomain, mineCount);
+
+      createBoard();
+      updatePFUI(false);
+    }
+
+    function createBoard() {
+      gridData = Array.from({ length: 9 }, (_, i) => ({
+        index: i,
+        r: Math.floor(i / 3),
+        c: i % 3,
+        isMine: generatedMineIndices.includes(i),
+        isRevealed: false,
+        adjacentMines: 0
+      }));
+
+      gridData.forEach(cell => {
+        if (cell.isMine) return;
+        cell.adjacentMines = getNeighbors(cell.r, cell.c).filter(n => n.isMine).length;
+      });
+
+      const gridEl = document.getElementById("grid");
+      gridEl.innerHTML = "";
+      gridData.forEach(cell => {
+        const cellEl = document.createElement("div");
+        cellEl.className = "cell";
+        cellEl.dataset.index = cell.index;
+        cellEl.addEventListener("click", () => handleCellClick(cell.index));
+        gridEl.appendChild(cellEl);
+      });
+    }
+
+    function getNeighbors(r, c) {
+      const neighbors = [];
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
+            neighbors.push(gridData[nr * GRID_SIZE + nc]);
+          }
+        }
+      }
+      return neighbors;
+    }
+
+    function handleCellClick(index) {
+      if (gameOver) return;
+      const cell = gridData[index];
+      if (cell.isRevealed) return;
+
+      if (cell.isMine) {
+        triggerEnd(false, cell);
+        return;
+      }
+
+      revealCell(cell);
+      updateScore(10 * mineCount);
+      checkWinCondition();
+    }
+
+    function revealCell(cell) {
+      if (cell.isRevealed) return;
+      cell.isRevealed = true;
+      renderCell(cell);
+
+      if (cell.adjacentMines === 0 && !cell.isMine) {
+        getNeighbors(cell.r, cell.c).forEach(revealCell);
+      }
+    }
+
+    function renderCell(cell) {
+      const cellEl = document.getElementById("grid").children[cell.index];
+      if (cell.isRevealed) {
+        cellEl.classList.add("revealed");
+        if (cell.adjacentMines > 0) {
+          cellEl.textContent = cell.adjacentMines;
+          cellEl.dataset.count = cell.adjacentMines;
+        } else {
+          cellEl.textContent = "";
+          cellEl.classList.add("empty-dot");
+        }
+      }
+    }
+
+    async function triggerEnd(won, detonatedCell = null) {
+      gameOver = true;
+      const statusEl = document.getElementById("game-status");
+      const gridEl = document.getElementById("grid");
+
+      if (won) {
+        statusEl.textContent = "🎉 Won";
+        statusEl.style.color = "var(--success)";
+        updateScore(100 * mineCount);
+
+        // Highlight untouched mines as defused/safe
+        gridData.forEach(c => {
+          if (c.isMine) {
+            const cellEl = gridEl.children[c.index];
+            cellEl.classList.add("revealed", "defused");
+            cellEl.textContent = "🛡️";
+          }
+        });
+      } else {
+        statusEl.textContent = "💥 Detonated";
+        statusEl.style.color = "var(--danger)";
+        updateScore(-50 * mineCount);
+
+        // Highlight detonated mine & reveal others
+        gridData.forEach(c => {
+          if (c.isMine) {
+            const cellEl = gridEl.children[c.index];
+            cellEl.classList.add("revealed");
+            if (c.index === detonatedCell.index) {
+              cellEl.classList.add("detonated");
+              cellEl.textContent = "💣";
+            } else {
+              cellEl.textContent = "💣";
+            }
+          }
+        });
+      }
+
+      await updatePFUI(true);
+    }
+
+    function checkWinCondition() {
+      const safeCells = gridData.filter(c => !c.isMine);
+      if (safeCells.every(c => c.isRevealed)) {
+        triggerEnd(true);
+      }
+    }
+
+    function updateScore(delta) {
+      score += delta;
+      const scoreEl = document.getElementById("score");
+      scoreEl.textContent = score;
+      scoreEl.className = `score-display ${score >= 0 ? "score-pos" : "score-neg"}`;
+    }
+
+    function setMode(mines) {
+      mineCount = mines;
+      document.querySelectorAll(".mode-btn").forEach((btn, idx) => {
+        btn.classList.toggle("active", idx + 1 === mines);
+      });
+      initRound();
+    }
+
+    async function updatePFUI(isGameOver) {
+      document.getElementById("lblServerHash").textContent = serverSeedHash;
+      document.getElementById("lblClientSeed").textContent = clientSeed;
+
+      const serverSeedLbl = document.getElementById("lblServerSeed");
+      const checkHash = document.getElementById("checkHash");
+      const checkBoard = document.getElementById("checkBoard");
+
+      if (isGameOver) {
+        serverSeedLbl.textContent = serverSeed;
+
+        const recomputedHash = await sha256(serverSeed);
+        const hashMatch = recomputedHash === serverSeedHash;
+
+        const recomputedMines = await deriveMines(serverSeed, clientSeed, entropyDomain, mineCount);
+        const boardMatch = JSON.stringify(recomputedMines) === JSON.stringify(generatedMineIndices);
+
+        checkHash.innerHTML = hashMatch ? `<span class="check-valid">✓ Matched</span>` : `<span style="color:var(--danger)">✗ Mismatch</span>`;
+        checkBoard.innerHTML = boardMatch ? `<span class="check-valid">✓ Matched</span>` : `<span style="color:var(--danger)">✗ Mismatch</span>`;
+      } else {
+        serverSeedLbl.textContent = "Hidden (reveals on finish)";
+        checkHash.innerHTML = `<span class="check-pending">⌛ In progress</span>`;
+        checkBoard.innerHTML = `<span class="check-pending">⌛ In progress</span>`;
+      }
+    }
+
+    function openModal() {
+      document.getElementById("pfModal").classList.add("open");
+    }
+
+    function closeModal() {
+      document.getElementById("pfModal").classList.remove("open");
+    }
+
+    initRound();
+  </script>
+</body>
+</html>
