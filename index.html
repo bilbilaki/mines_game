@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>3x3 Mines</title>
+  <title>3x3 Provably Fair Mines</title>
   <style>
     :root {
-      --bg: #0b0f19;
+      --bg: #090d16;
       --card: #121a2d;
       --card-inner: #18223a;
       --cell-unrevealed: #233152;
@@ -19,7 +19,8 @@
       --danger: #ef4444;
       --danger-bg: rgba(239, 68, 68, 0.25);
       --success: #22c55e;
-      --success-bg: rgba(34, 197, 94, 0.2);
+      --gem: #38bdf8;
+      --gem-bg: rgba(56, 189, 248, 0.2);
     }
 
     * {
@@ -107,7 +108,7 @@
       background: var(--card-inner);
       padding: 0.75rem 1rem;
       border-radius: 0.6rem;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       border: 1px solid var(--border);
     }
 
@@ -118,18 +119,33 @@
     .score-pos { color: var(--success); }
     .score-neg { color: var(--danger); }
 
-    .action-btn {
-      background: var(--accent);
-      color: #090d16;
+    .actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn {
+      flex: 1;
       border: none;
       padding: 0.65rem;
       border-radius: 0.6rem;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       font-weight: 800;
       cursor: pointer;
       transition: opacity 0.1s;
     }
-    .action-btn:active { opacity: 0.8; }
+    .btn:active { opacity: 0.8; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-cashout {
+      background: var(--success);
+      color: #052e16;
+    }
+
+    .btn-new {
+      background: var(--accent);
+      color: #090d16;
+    }
 
     .grid {
       display: grid;
@@ -146,7 +162,6 @@
       align-items: center;
       justify-content: center;
       font-size: 1.7rem;
-      font-weight: 800;
       cursor: pointer;
       border: 1px solid rgba(255, 255, 255, 0.08);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 3px 6px rgba(0, 0, 0, 0.3);
@@ -162,16 +177,14 @@
     }
 
     .cell.revealed {
-      background: var(--cell-revealed);
       cursor: default;
       box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
       border: 1px solid #1a253a;
     }
 
-    .cell.revealed.empty-dot::after {
-      content: "•";
-      color: #334155;
-      font-size: 1.2rem;
+    .cell.gem {
+      background: var(--gem-bg) !important;
+      border-color: var(--gem) !important;
     }
 
     .cell.detonated {
@@ -179,15 +192,10 @@
       border-color: var(--danger) !important;
     }
 
-    .cell.defused {
-      background: var(--success-bg) !important;
-      border-color: var(--success) !important;
+    .cell.hidden-mine {
+      background: var(--cell-revealed);
+      opacity: 0.6;
     }
-
-    .cell[data-count="1"] { color: #38bdf8; }
-    .cell[data-count="2"] { color: #4ade80; }
-    .cell[data-count="3"] { color: #f87171; }
-    .cell[data-count="4"] { color: #c084fc; }
 
     /* Provably Fair Modal */
     .modal-overlay {
@@ -302,11 +310,15 @@
     </div>
 
     <div class="status-bar">
-      <span>Score: <span id="score" class="score-display score-pos">0</span></span>
+      <span>Total: <span id="score" class="score-display score-pos">0</span></span>
+      <span>Pending: <span id="pending-points" style="font-weight: 800; color: var(--accent);">+0</span></span>
       <span id="game-status" style="font-weight: 800;">Active</span>
     </div>
 
-    <button class="action-btn" onclick="initRound()">New Game</button>
+    <div class="actions">
+      <button id="btnCashout" class="btn btn-cashout" onclick="cashOut()" disabled>Cash Out</button>
+      <button class="btn btn-new" onclick="initRound()">New Game</button>
+    </div>
 
     <div class="grid" id="grid"></div>
   </div>
@@ -356,9 +368,9 @@
   </div>
 
   <script>
-    const GRID_SIZE = 3;
     let mineCount = 1;
-    let score = 0;
+    let totalScore = 0;
+    let roundPoints = 0;
     let gameOver = false;
     let gridData = [];
 
@@ -398,6 +410,10 @@
 
     async function initRound() {
       gameOver = false;
+      roundPoints = 0;
+      updatePendingDisplay();
+      
+      document.getElementById("btnCashout").disabled = true;
       const statusEl = document.getElementById("game-status");
       statusEl.textContent = "Active";
       statusEl.style.color = "inherit";
@@ -415,17 +431,9 @@
     function createBoard() {
       gridData = Array.from({ length: 9 }, (_, i) => ({
         index: i,
-        r: Math.floor(i / 3),
-        c: i % 3,
         isMine: generatedMineIndices.includes(i),
-        isRevealed: false,
-        adjacentMines: 0
+        isRevealed: false
       }));
-
-      gridData.forEach(cell => {
-        if (cell.isMine) return;
-        cell.adjacentMines = getNeighbors(cell.r, cell.c).filter(n => n.isMine).length;
-      });
 
       const gridEl = document.getElementById("grid");
       gridEl.innerHTML = "";
@@ -438,112 +446,93 @@
       });
     }
 
-    function getNeighbors(r, c) {
-      const neighbors = [];
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          const nr = r + dr, nc = c + dc;
-          if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
-            neighbors.push(gridData[nr * GRID_SIZE + nc]);
-          }
-        }
-      }
-      return neighbors;
-    }
-
     function handleCellClick(index) {
       if (gameOver) return;
       const cell = gridData[index];
       if (cell.isRevealed) return;
 
-      if (cell.isMine) {
-        triggerEnd(false, cell);
-        return;
-      }
-
-      revealCell(cell);
-      updateScore(10 * mineCount);
-      checkWinCondition();
-    }
-
-    function revealCell(cell) {
-      if (cell.isRevealed) return;
       cell.isRevealed = true;
-      renderCell(cell);
+      const cellEl = document.getElementById("grid").children[index];
+      cellEl.classList.add("revealed");
 
-      if (cell.adjacentMines === 0 && !cell.isMine) {
-        getNeighbors(cell.r, cell.c).forEach(revealCell);
+      if (cell.isMine) {
+        // Hit a bomb
+        cellEl.classList.add("detonated");
+        cellEl.textContent = "💣";
+        triggerEnd(false);
+      } else {
+        // Hit a gem (Single tile reveal, NO cascade)
+        cellEl.classList.add("gem");
+        cellEl.textContent = "💎";
+        roundPoints += 20 * mineCount;
+        updatePendingDisplay();
+        document.getElementById("btnCashout").disabled = false;
+
+        checkAutoWin();
       }
     }
 
-    function renderCell(cell) {
-      const cellEl = document.getElementById("grid").children[cell.index];
-      if (cell.isRevealed) {
-        cellEl.classList.add("revealed");
-        if (cell.adjacentMines > 0) {
-          cellEl.textContent = cell.adjacentMines;
-          cellEl.dataset.count = cell.adjacentMines;
-        } else {
-          cellEl.textContent = "";
-          cellEl.classList.add("empty-dot");
-        }
+    function cashOut() {
+      if (gameOver || roundPoints === 0) return;
+      totalScore += roundPoints;
+      updateScoreDisplay();
+      triggerEnd(true, true);
+    }
+
+    function checkAutoWin() {
+      const remainingGems = gridData.filter(c => !c.isMine && !c.isRevealed);
+      if (remainingGems.length === 0) {
+        // Cleared entire board
+        roundPoints += 50 * mineCount;
+        totalScore += roundPoints;
+        updateScoreDisplay();
+        triggerEnd(true, false);
       }
     }
 
-    async function triggerEnd(won, detonatedCell = null) {
+    async function triggerEnd(won, isCashout = false) {
       gameOver = true;
+      document.getElementById("btnCashout").disabled = true;
+
       const statusEl = document.getElementById("game-status");
       const gridEl = document.getElementById("grid");
 
       if (won) {
-        statusEl.textContent = "🎉 Won";
+        statusEl.textContent = isCashout ? "💰 Cashed Out" : "🎉 All Gems Found!";
         statusEl.style.color = "var(--success)";
-        updateScore(100 * mineCount);
-
-        // Highlight untouched mines as defused/safe
-        gridData.forEach(c => {
-          if (c.isMine) {
-            const cellEl = gridEl.children[c.index];
-            cellEl.classList.add("revealed", "defused");
-            cellEl.textContent = "🛡️";
-          }
-        });
       } else {
         statusEl.textContent = "💥 Detonated";
         statusEl.style.color = "var(--danger)";
-        updateScore(-50 * mineCount);
-
-        // Highlight detonated mine & reveal others
-        gridData.forEach(c => {
-          if (c.isMine) {
-            const cellEl = gridEl.children[c.index];
-            cellEl.classList.add("revealed");
-            if (c.index === detonatedCell.index) {
-              cellEl.classList.add("detonated");
-              cellEl.textContent = "💣";
-            } else {
-              cellEl.textContent = "💣";
-            }
-          }
-        });
+        totalScore -= 30 * mineCount;
+        updateScoreDisplay();
       }
+
+      // Reveal remaining mines and gems safely
+      gridData.forEach(c => {
+        const cellEl = gridEl.children[c.index];
+        if (!c.isRevealed) {
+          cellEl.classList.add("revealed");
+          if (c.isMine) {
+            cellEl.classList.add("hidden-mine");
+            cellEl.textContent = "💣";
+          } else {
+            cellEl.textContent = "💎";
+            cellEl.style.opacity = "0.5";
+          }
+        }
+      });
 
       await updatePFUI(true);
     }
 
-    function checkWinCondition() {
-      const safeCells = gridData.filter(c => !c.isMine);
-      if (safeCells.every(c => c.isRevealed)) {
-        triggerEnd(true);
-      }
+    function updateScoreDisplay() {
+      const scoreEl = document.getElementById("score");
+      scoreEl.textContent = totalScore;
+      scoreEl.className = `score-display ${totalScore >= 0 ? "score-pos" : "score-neg"}`;
     }
 
-    function updateScore(delta) {
-      score += delta;
-      const scoreEl = document.getElementById("score");
-      scoreEl.textContent = score;
-      scoreEl.className = `score-display ${score >= 0 ? "score-pos" : "score-neg"}`;
+    function updatePendingDisplay() {
+      document.getElementById("pending-points").textContent = `+${roundPoints}`;
     }
 
     function setMode(mines) {
@@ -580,13 +569,8 @@
       }
     }
 
-    function openModal() {
-      document.getElementById("pfModal").classList.add("open");
-    }
-
-    function closeModal() {
-      document.getElementById("pfModal").classList.remove("open");
-    }
+    function openModal() { document.getElementById("pfModal").classList.add("open"); }
+    function closeModal() { document.getElementById("pfModal").classList.remove("open"); }
 
     initRound();
   </script>
