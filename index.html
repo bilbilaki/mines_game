@@ -49,7 +49,7 @@
       border: 1px solid var(--border);
       box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
       width: 100%;
-      max-width: 360px;
+      max-width: 380px;
       display: flex;
       flex-direction: column;
       gap: 0.85rem;
@@ -77,6 +77,79 @@
       cursor: pointer;
     }
 
+    /* Bankroll & Wallet Controls */
+    .wallet-box {
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .wallet-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    .balance-display {
+      font-weight: 800;
+      font-size: 1.15rem;
+      color: var(--success);
+    }
+
+    .deposit-controls {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .input-field {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.45rem 0.6rem;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      width: 100%;
+      outline: none;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent);
+    }
+
+    .btn-sm {
+      background: var(--cell-unrevealed);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.6rem;
+      border-radius: 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-sm:hover {
+      background: var(--cell-unrevealed-hover);
+    }
+
+    .preset-btns {
+      display: flex;
+      gap: 0.3rem;
+      margin-top: 0.2rem;
+    }
+
+    .preset-btns .btn-sm {
+      flex: 1;
+      text-align: center;
+      padding: 0.3rem 0;
+    }
+
     .modes {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -101,23 +174,26 @@
       color: var(--accent);
     }
 
+    .mode-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .status-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
       background: var(--card-inner);
-      padding: 0.75rem 1rem;
+      padding: 0.65rem 0.85rem;
       border-radius: 0.6rem;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       border: 1px solid var(--border);
     }
 
-    .score-display {
+    .info-val {
       font-weight: 800;
-      font-size: 1.15rem;
+      color: var(--accent);
     }
-    .score-pos { color: var(--success); }
-    .score-neg { color: var(--danger); }
 
     .actions {
       display: flex;
@@ -168,12 +244,16 @@
       transition: transform 0.05s ease, background 0.15s ease;
     }
 
-    .cell:hover:not(.revealed) {
+    .cell:hover:not(.revealed):not(.disabled) {
       background: var(--cell-unrevealed-hover);
     }
 
-    .cell:active:not(.revealed) {
+    .cell:active:not(.revealed):not(.disabled) {
       transform: scale(0.96);
+    }
+
+    .cell.disabled {
+      cursor: not-allowed;
     }
 
     .cell.revealed {
@@ -303,21 +383,45 @@
       <div class="pf-badge" onclick="openModal()">⚖️ Provably Fair</div>
     </div>
 
+    <!-- Wallet / Balance Management -->
+    <div class="wallet-box">
+      <div class="wallet-row">
+        <span>Balance: <span id="balance" class="balance-display">$10.00</span></span>
+      </div>
+      <div class="deposit-controls">
+        <input type="number" id="depositInput" class="input-field" placeholder="Amount" min="0.1" step="0.01" value="10.00">
+        <button class="btn-sm" onclick="handleDeposit()">Set Deposit</button>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.2rem;">Bet Amount (Min $0.10):</div>
+      <div class="deposit-controls">
+        <input type="number" id="betInput" class="input-field" placeholder="Bet" min="0.1" step="0.01" value="1.00">
+      </div>
+      <div class="preset-btns">
+        <button class="btn-sm" onclick="setPresetBet(0.1)">0.10</button>
+        <button class="btn-sm" onclick="setPresetBet(1.0)">1.00</button>
+        <button class="btn-sm" onclick="setPresetBet(5.0)">5.00</button>
+        <button class="btn-sm" onclick="setPresetBet('MAX')">MAX</button>
+      </div>
+    </div>
+
+    <!-- Game Modes -->
     <div class="modes">
-      <button class="mode-btn active" onclick="setMode(1)">Mode 1<br><span style="font-size:0.65rem;opacity:0.8">1 Mine</span></button>
-      <button class="mode-btn" onclick="setMode(2)">Mode 2<br><span style="font-size:0.65rem;opacity:0.8">2 Mines</span></button>
-      <button class="mode-btn" onclick="setMode(3)">Mode 3<br><span style="font-size:0.65rem;opacity:0.8">3 Mines</span></button>
+      <button class="mode-btn active" id="modeBtn1" onclick="setMode(1)">Mode 1<br><span style="font-size:0.65rem;opacity:0.8">1 Mine</span></button>
+      <button class="mode-btn" id="modeBtn2" onclick="setMode(2)">Mode 2<br><span style="font-size:0.65rem;opacity:0.8">2 Mines</span></button>
+      <button class="mode-btn" id="modeBtn3" onclick="setMode(3)">Mode 3<br><span style="font-size:0.65rem;opacity:0.8">3 Mines</span></button>
     </div>
 
+    <!-- Status Bar -->
     <div class="status-bar">
-      <span>Total: <span id="score" class="score-display score-pos">0</span></span>
-      <span>Pending: <span id="pending-points" style="font-weight: 800; color: var(--accent);">+0</span></span>
-      <span id="game-status" style="font-weight: 800;">Active</span>
+      <span>Mult: <span id="current-mult" class="info-val">1.00×</span></span>
+      <span>Win: <span id="pending-cashout" class="info-val" style="color: var(--success);">$0.00</span></span>
+      <span id="game-status" style="font-weight: 800;">Place Bet</span>
     </div>
 
+    <!-- Action Buttons -->
     <div class="actions">
       <button id="btnCashout" class="btn btn-cashout" onclick="cashOut()" disabled>Cash Out</button>
-      <button class="btn btn-new" onclick="initRound()">New Game</button>
+      <button id="btnStart" class="btn btn-new" onclick="startRound()">Start Game</button>
     </div>
 
     <div class="grid" id="grid"></div>
@@ -368,10 +472,19 @@
   </div>
 
   <script>
+    // Multipliers Config
+    const MULTIPLIERS = {
+      1: [1.13, 1.29, 1.50, 1.80, 2.25, 3.00, 4.50, 9.00],
+      2: [1.29, 1.71, 2.40, 3.60, 6.00, 12.00, 36.00],
+      3: [1.50, 2.40, 4.20, 8.40, 21.00, 84.00]
+    };
+
+    let userBalance = 10.00;
+    let currentBet = 1.00;
     let mineCount = 1;
-    let totalScore = 0;
-    let roundPoints = 0;
-    let gameOver = false;
+    let stepCount = 0;
+    let isRoundActive = false;
+    let gameOver = true;
     let gridData = [];
 
     // Provably Fair State
@@ -408,16 +521,89 @@
       return mines;
     }
 
-    async function initRound() {
-      gameOver = false;
-      roundPoints = 0;
-      updatePendingDisplay();
-      
-      document.getElementById("btnCashout").disabled = true;
-      const statusEl = document.getElementById("game-status");
-      statusEl.textContent = "Active";
-      statusEl.style.color = "inherit";
+    function updateBalanceDisplay() {
+      document.getElementById("balance").textContent = `$${userBalance.toFixed(2)}`;
+    }
 
+    function handleDeposit() {
+      const val = parseFloat(document.getElementById("depositInput").value);
+      if (!isNaN(val) && val >= 0) {
+        userBalance = val;
+        updateBalanceDisplay();
+      }
+    }
+
+    function setPresetBet(val) {
+      if (isRoundActive) return;
+      const betInput = document.getElementById("betInput");
+      if (val === 'MAX') {
+        betInput.value = userBalance.toFixed(2);
+      } else {
+        betInput.value = val.toFixed(2);
+      }
+    }
+
+    function setMode(mines) {
+      if (isRoundActive) return;
+      mineCount = mines;
+      document.querySelectorAll(".mode-btn").forEach((btn, idx) => {
+        btn.classList.toggle("active", idx + 1 === mines);
+      });
+      resetDisplayUI();
+    }
+
+    function resetDisplayUI() {
+      document.getElementById("current-mult").textContent = "1.00×";
+      document.getElementById("pending-cashout").textContent = "$0.00";
+      const statusEl = document.getElementById("game-status");
+      statusEl.textContent = "Place Bet";
+      statusEl.style.color = "inherit";
+      createEmptyBoard();
+    }
+
+    function createEmptyBoard() {
+      const gridEl = document.getElementById("grid");
+      gridEl.innerHTML = "";
+      for (let i = 0; i < 9; i++) {
+        const cellEl = document.createElement("div");
+        cellEl.className = "cell disabled";
+        gridEl.appendChild(cellEl);
+      }
+    }
+
+    async function startRound() {
+      const betVal = parseFloat(document.getElementById("betInput").value);
+      
+      if (isNaN(betVal) || betVal < 0.1) {
+        alert("Minimum bet is $0.10");
+        return;
+      }
+      if (betVal > userBalance) {
+        alert("Insufficient balance!");
+        return;
+      }
+
+      currentBet = betVal;
+      userBalance -= currentBet;
+      updateBalanceDisplay();
+
+      isRoundActive = true;
+      gameOver = false;
+      stepCount = 0;
+
+      // Lock controls
+      toggleControls(true);
+
+      document.getElementById("btnCashout").disabled = true;
+      document.getElementById("btnStart").disabled = true;
+
+      const statusEl = document.getElementById("game-status");
+      statusEl.textContent = "In Game";
+      statusEl.style.color = "var(--accent)";
+
+      updateRoundDisplays();
+
+      // Seed setup
       serverSeed = generateHex(32);
       serverSeedHash = await sha256(serverSeed);
       clientSeed = generateHex(16);
@@ -426,6 +612,12 @@
 
       createBoard();
       updatePFUI(false);
+    }
+
+    function toggleControls(disable) {
+      document.getElementById("betInput").disabled = disable;
+      document.getElementById("depositInput").disabled = disable;
+      document.querySelectorAll(".mode-btn").forEach(b => b.disabled = disable);
     }
 
     function createBoard() {
@@ -447,7 +639,7 @@
     }
 
     function handleCellClick(index) {
-      if (gameOver) return;
+      if (gameOver || !isRoundActive) return;
       const cell = gridData[index];
       if (cell.isRevealed) return;
 
@@ -456,58 +648,79 @@
       cellEl.classList.add("revealed");
 
       if (cell.isMine) {
-        // Hit a bomb
+        // Detonated - Loss
         cellEl.classList.add("detonated");
         cellEl.textContent = "💣";
         triggerEnd(false);
       } else {
-        // Hit a gem (Single tile reveal, NO cascade)
+        // Gem Found - Step Up
         cellEl.classList.add("gem");
         cellEl.textContent = "💎";
-        roundPoints += 20 * mineCount;
-        updatePendingDisplay();
+        stepCount++;
+        
+        updateRoundDisplays();
         document.getElementById("btnCashout").disabled = false;
 
         checkAutoWin();
       }
     }
 
+    function getCurrentMultiplier() {
+      if (stepCount === 0) return 1.0;
+      return MULTIPLIERS[mineCount][stepCount - 1];
+    }
+
+    function updateRoundDisplays() {
+      const mult = getCurrentMultiplier();
+      const currentPayout = currentBet * mult;
+
+      document.getElementById("current-mult").textContent = `${mult.toFixed(2)}×`;
+      document.getElementById("pending-cashout").textContent = `$${currentPayout.toFixed(2)}`;
+    }
+
     function cashOut() {
-      if (gameOver || roundPoints === 0) return;
-      totalScore += roundPoints;
-      updateScoreDisplay();
+      if (gameOver || !isRoundActive || stepCount === 0) return;
+      
+      const payout = currentBet * getCurrentMultiplier();
+      userBalance += payout;
+      updateBalanceDisplay();
+
       triggerEnd(true, true);
     }
 
     function checkAutoWin() {
-      const remainingGems = gridData.filter(c => !c.isMine && !c.isRevealed);
-      if (remainingGems.length === 0) {
-        // Cleared entire board
-        roundPoints += 50 * mineCount;
-        totalScore += roundPoints;
-        updateScoreDisplay();
+      const maxSteps = 9 - mineCount;
+      if (stepCount >= maxSteps) {
+        const payout = currentBet * getCurrentMultiplier();
+        userBalance += payout;
+        updateBalanceDisplay();
+
         triggerEnd(true, false);
       }
     }
 
     async function triggerEnd(won, isCashout = false) {
       gameOver = true;
+      isRoundActive = false;
+
       document.getElementById("btnCashout").disabled = true;
+      document.getElementById("btnStart").disabled = false;
+      toggleControls(false);
 
       const statusEl = document.getElementById("game-status");
       const gridEl = document.getElementById("grid");
 
       if (won) {
-        statusEl.textContent = isCashout ? "💰 Cashed Out" : "🎉 All Gems Found!";
+        const winAmount = currentBet * getCurrentMultiplier();
+        statusEl.textContent = isCashout ? `💰 Cashed Out $${winAmount.toFixed(2)}` : `🎉 Won $${winAmount.toFixed(2)}!`;
         statusEl.style.color = "var(--success)";
       } else {
         statusEl.textContent = "💥 Detonated";
         statusEl.style.color = "var(--danger)";
-        totalScore -= 30 * mineCount;
-        updateScoreDisplay();
+        document.getElementById("pending-cashout").textContent = "$0.00";
       }
 
-      // Reveal remaining mines and gems safely
+      // Reveal remaining elements
       gridData.forEach(c => {
         const cellEl = gridEl.children[c.index];
         if (!c.isRevealed) {
@@ -523,24 +736,6 @@
       });
 
       await updatePFUI(true);
-    }
-
-    function updateScoreDisplay() {
-      const scoreEl = document.getElementById("score");
-      scoreEl.textContent = totalScore;
-      scoreEl.className = `score-display ${totalScore >= 0 ? "score-pos" : "score-neg"}`;
-    }
-
-    function updatePendingDisplay() {
-      document.getElementById("pending-points").textContent = `+${roundPoints}`;
-    }
-
-    function setMode(mines) {
-      mineCount = mines;
-      document.querySelectorAll(".mode-btn").forEach((btn, idx) => {
-        btn.classList.toggle("active", idx + 1 === mines);
-      });
-      initRound();
     }
 
     async function updatePFUI(isGameOver) {
@@ -572,7 +767,8 @@
     function openModal() { document.getElementById("pfModal").classList.add("open"); }
     function closeModal() { document.getElementById("pfModal").classList.remove("open"); }
 
-    initRound();
+    updateBalanceDisplay();
+    createEmptyBoard();
   </script>
 </body>
 </html>
